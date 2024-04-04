@@ -274,12 +274,12 @@ class TransformerForDiffusion(ModuleAttrMixin):
         timestep: Union[torch.Tensor, float, int], 
         cond: Optional[torch.Tensor]=None, **kwargs):
         """
-        sample: input features (B, T, input_dim)
+        sample: input actions (B, T, input_dim)
         timestep: tensor with shape (B,) or int, diffusion step. If tensor, all the elements are equal to int timestep
         cond: observation used for conditioning (B, T_o, cond_dim)
         output: (B, T, input_dim)
         """
-        # 1. time
+        # 1. process time step
         timesteps = timestep
         if not torch.is_tensor(timesteps):
             # TODO: this requires sync between CPU and GPU. So try to pass timesteps as tensors if you can
@@ -290,8 +290,8 @@ class TransformerForDiffusion(ModuleAttrMixin):
         timesteps = timesteps.expand(sample.shape[0])
         time_emb = self.time_emb(timesteps).unsqueeze(1)  # (B, 1, n_emb)
 
-        # process input
-        input_emb = self.input_emb(sample)
+        # 2. process input actions
+        input_emb = self.input_emb(sample)  # input_emb: nn.Linear(input_dim, n_emb)
 
         if self.encoder_only:
             """
@@ -306,43 +306,38 @@ class TransformerForDiffusion(ModuleAttrMixin):
             
         else:
             """
-            Encoder-decoder architecture. Observation and time step is conditioned on the input features
-            using cross attention.
+            Transformer decoder architecture. Observation and time step are conditioned on the input actions
+            through cross attention.
             """
-            # encoder
+            ### conditional encoder
             cond_embeddings = time_emb
             if self.obs_as_cond:
-                cond_obs_emb = self.cond_obs_emb(cond)  # (B,T_o,n_emb)
-                cond_embeddings = torch.cat([cond_embeddings, cond_obs_emb], dim=1)
+                cond_obs_emb = self.cond_obs_emb(cond)  # (B, T_o, n_emb)
+                cond_embeddings = torch.cat([cond_embeddings, cond_obs_emb], dim=1)  # (B, 1+T_o, n_emb)
+                
             tc = cond_embeddings.shape[1]
-            position_embeddings = self.cond_pos_emb[
-                :, :tc, :
-            ]  # each position maps to a (learnable) vector
+            position_embeddings = self.cond_pos_emb[:, :tc, :]  # (1, 1+T_o, n_emb)
             x = self.drop(cond_embeddings + position_embeddings)
-            x = self.encoder(x)
-            memory = x
-            # (B,T_cond,n_emb)
+            x = self.encoder(x)  # encoder: Transformer encoder or MLP
+            memory = x  # (B, 1+T_o, n_emb)
             
-            # decoder
+            ### Transformer decoder (cross attention)
             token_embeddings = input_emb
             t = token_embeddings.shape[1]
-            position_embeddings = self.pos_emb[
-                :, :t, :
-            ]  # each position maps to a (learnable) vector
-            x = self.drop(token_embeddings + position_embeddings)
-            # (B,T,n_emb)
+            position_embeddings = self.pos_emb[:, :t, :]  # (1, T, n_emb)
+            x = self.drop(token_embeddings + position_embeddings)  # (B, T, n_emb)
+            # x serves as query, while condtional embedding serves as key and value
             x = self.decoder(
                 tgt=x,
                 memory=memory,
                 tgt_mask=self.mask,
                 memory_mask=self.memory_mask
-            )
-            # (B,T,n_emb)
+            )  # (B, T, n_emb)
         
-        # head
+        # LayerNorm and Linear projection
         x = self.ln_f(x)
         x = self.head(x)
-        # (B,T,n_out)
+    
         return x
 
 
