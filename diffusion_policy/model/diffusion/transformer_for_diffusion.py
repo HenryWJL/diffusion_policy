@@ -45,10 +45,10 @@ class TransformerForDiffusion(ModuleAttrMixin):
         self.pos_emb = nn.Parameter(torch.zeros(1, T, n_emb))
         self.drop = nn.Dropout(p_drop_emb)
 
-        # cond encoder
+        # time embedding
         self.time_emb = SinusoidalPosEmb(n_emb)
+        # observation embedding    
         self.cond_obs_emb = None
-        
         if obs_as_cond:
             self.cond_obs_emb = nn.Linear(cond_dim, n_emb)
 
@@ -58,6 +58,7 @@ class TransformerForDiffusion(ModuleAttrMixin):
         encoder_only = False
         if T_cond > 0:
             self.cond_pos_emb = nn.Parameter(torch.zeros(1, T_cond, n_emb))
+            # use Transformer encoder as condition encoder
             if n_cond_layers > 0:
                 encoder_layer = nn.TransformerEncoderLayer(
                     d_model=n_emb,
@@ -72,13 +73,14 @@ class TransformerForDiffusion(ModuleAttrMixin):
                     encoder_layer=encoder_layer,
                     num_layers=n_cond_layers
                 )
+            # use MLP as condition encoder
             else:
                 self.encoder = nn.Sequential(
                     nn.Linear(n_emb, 4 * n_emb),
                     nn.Mish(),
                     nn.Linear(4 * n_emb, n_emb)
                 )
-            # decoder
+            # use Transformer decoder as decoder
             decoder_layer = nn.TransformerDecoderLayer(
                 d_model=n_emb,
                 nhead=n_head,
@@ -93,7 +95,7 @@ class TransformerForDiffusion(ModuleAttrMixin):
                 num_layers=n_layer
             )
         else:
-            # encoder only BERT
+            # encoder only (BERT)
             encoder_only = True
 
             encoder_layer = nn.TransformerEncoderLayer(
@@ -272,10 +274,10 @@ class TransformerForDiffusion(ModuleAttrMixin):
         timestep: Union[torch.Tensor, float, int], 
         cond: Optional[torch.Tensor]=None, **kwargs):
         """
-        x: (B,T,input_dim)
-        timestep: (B,) or int, diffusion step
-        cond: (B,T',cond_dim)
-        output: (B,T,input_dim)
+        sample: input features (B, T, input_dim)
+        timestep: tensor with shape (B,) or int, diffusion step. If tensor, all the elements are equal to int timestep
+        cond: observation used for conditioning (B, T_o, cond_dim)
+        output: (B, T, input_dim)
         """
         # 1. time
         timesteps = timestep
@@ -286,31 +288,31 @@ class TransformerForDiffusion(ModuleAttrMixin):
             timesteps = timesteps[None].to(sample.device)
         # broadcast to batch dimension in a way that's compatible with ONNX/Core ML
         timesteps = timesteps.expand(sample.shape[0])
-        time_emb = self.time_emb(timesteps).unsqueeze(1)
-        # (B,1,n_emb)
+        time_emb = self.time_emb(timesteps).unsqueeze(1)  # (B, 1, n_emb)
 
         # process input
         input_emb = self.input_emb(sample)
 
         if self.encoder_only:
-            # BERT
-            token_embeddings = torch.cat([time_emb, input_emb], dim=1)
+            """
+            Bert-like architecture. Time step is concatenated with input features to serve as conditioning.
+            """
+            token_embeddings = torch.cat([time_emb, input_emb], dim=1)  # (B, 1+T, n_emb)
             t = token_embeddings.shape[1]
-            position_embeddings = self.pos_emb[
-                :, :t, :
-            ]  # each position maps to a (learnable) vector
-            x = self.drop(token_embeddings + position_embeddings)
-            # (B,T+1,n_emb)
-            x = self.encoder(src=x, mask=self.mask)
-            # (B,T+1,n_emb)
-            x = x[:,1:,:]
-            # (B,T,n_emb)
+            position_embeddings = self.pos_emb[:, :t, :]  # (1, 1+T, n_emb)
+            x = self.drop(token_embeddings + position_embeddings)  # (B, 1+T, n_emb)
+            x = self.encoder(src=x, mask=self.mask)  # (B, 1+T, n_emb)
+            x = x[:, 1:, :]  # (B, T, n_emb)
+            
         else:
+            """
+            Encoder-decoder architecture. Observation and time step is conditioned on the input features
+            using cross attention.
+            """
             # encoder
             cond_embeddings = time_emb
             if self.obs_as_cond:
-                cond_obs_emb = self.cond_obs_emb(cond)
-                # (B,To,n_emb)
+                cond_obs_emb = self.cond_obs_emb(cond)  # (B,T_o,n_emb)
                 cond_embeddings = torch.cat([cond_embeddings, cond_obs_emb], dim=1)
             tc = cond_embeddings.shape[1]
             position_embeddings = self.cond_pos_emb[
