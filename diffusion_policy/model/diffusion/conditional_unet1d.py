@@ -26,11 +26,11 @@ class ConditionalResidualBlock1D(nn.Module):
             Conv1dBlock(out_channels, out_channels, kernel_size, n_groups=n_groups),
         ])
 
-        # FiLM modulation https://arxiv.org/abs/1709.07871
-        # predicts per-channel scale and bias
+        # conditional encoder
         cond_channels = out_channels
         if cond_predict_scale:
             cond_channels = out_channels * 2
+            
         self.cond_predict_scale = cond_predict_scale
         self.out_channels = out_channels
         self.cond_encoder = nn.Sequential(
@@ -45,22 +45,25 @@ class ConditionalResidualBlock1D(nn.Module):
 
     def forward(self, x, cond):
         '''
-            x : [ batch_size x in_channels x horizon ]
-            cond : [ batch_size x cond_dim]
+            x : (B, in_channels, T)
+            cond : (B, cond_dim)
 
             returns:
-            out : [ batch_size x out_channels x horizon ]
+            out : (B, out_channels, T)
         '''
-        out = self.blocks[0](x)
-        embed = self.cond_encoder(cond)
+        out = self.blocks[0](x)  # (B, out_channels, T)
+        embed = self.cond_encoder(cond)  # (B, cond_dim, 1)
+        # FiLM conditioning
         if self.cond_predict_scale:
             embed = embed.reshape(
                 embed.shape[0], 2, self.out_channels, 1)
-            scale = embed[:,0,...]
-            bias = embed[:,1,...]
+            scale = embed[:, 0,...]
+            bias = embed[:, 1,...]
             out = scale * out + bias
+            
         else:
             out = out + embed
+            
         out = self.blocks[1](out)
         out = out + self.residual_conv(x)
         return out
@@ -91,7 +94,8 @@ class ConditionalUnet1D(nn.Module):
         cond_dim = dsed
         if global_cond_dim is not None:
             cond_dim += global_cond_dim
-
+            
+        # get in_channel-out_channel pairs [(C_in, C_out), ...]
         in_out = list(zip(all_dims[:-1], all_dims[1:]))
 
         local_cond_encoder = None
@@ -175,15 +179,15 @@ class ConditionalUnet1D(nn.Module):
             timestep: Union[torch.Tensor, float, int], 
             local_cond=None, global_cond=None, **kwargs):
         """
-        x: (B,T,input_dim)
-        timestep: (B,) or int, diffusion step
-        local_cond: (B,T,local_cond_dim)
-        global_cond: (B,global_cond_dim)
-        output: (B,T,input_dim)
+        sample: (B, T, input_dim)
+        timestep: tensor (B,) or int, diffusion step
+        local_cond: (B, T, local_cond_dim)
+        global_cond: (B, global_cond_dim)
+        output: (B, T, input_dim)
         """
         sample = einops.rearrange(sample, 'b h t -> b t h')
 
-        # 1. time
+        # 1. process time steps
         timesteps = timestep
         if not torch.is_tensor(timesteps):
             # TODO: this requires sync between CPU and GPU. So try to pass timesteps as tensors if you can
@@ -192,7 +196,6 @@ class ConditionalUnet1D(nn.Module):
             timesteps = timesteps[None].to(sample.device)
         # broadcast to batch dimension in a way that's compatible with ONNX/Core ML
         timesteps = timesteps.expand(sample.shape[0])
-
         global_feature = self.diffusion_step_encoder(timesteps)
 
         if global_cond is not None:
@@ -239,4 +242,3 @@ class ConditionalUnet1D(nn.Module):
 
         x = einops.rearrange(x, 'b t h -> b h t')
         return x
-
