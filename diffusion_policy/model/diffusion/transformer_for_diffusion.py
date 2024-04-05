@@ -277,7 +277,7 @@ class TransformerForDiffusion(ModuleAttrMixin):
         sample: input actions (B, T, input_dim)
         timestep: tensor with shape (B,) or int, diffusion step. If tensor, all the elements are equal to int timestep
         cond: observation used for conditioning (B, T_o, cond_dim)
-        output: (B, T, input_dim)
+        output: noise (B, T, input_dim)
         """
         # 1. process time step
         timesteps = timestep
