@@ -30,36 +30,36 @@ class TransformerForDiffusion(ModuleAttrMixin):
         if n_obs_steps is None:
             n_obs_steps = horizon
         
-        T = horizon
-        T_cond = 1
-        if not time_as_cond:
+        T = horizon  # action horizon
+        T_cond = 1  # conditioning horizon
+        if not time_as_cond:  # time_as_cond: default is True
             T += 1
             T_cond -= 1
         obs_as_cond = cond_dim > 0
         if obs_as_cond:
             assert time_as_cond
-            T_cond += n_obs_steps
+            T_cond += n_obs_steps  # obs includes visual and proprioceptive obs
 
         # input embedding stem
         self.input_emb = nn.Linear(input_dim, n_emb)
-        self.pos_emb = nn.Parameter(torch.zeros(1, T, n_emb))
+        self.pos_emb = nn.Parameter(torch.zeros(1, T, n_emb))  # learned action token pos embed
         self.drop = nn.Dropout(p_drop_emb)
 
         # time embedding
-        self.time_emb = SinusoidalPosEmb(n_emb)
+        self.time_emb = SinusoidalPosEmb(n_emb)  # time step embedding
         # observation embedding    
         self.cond_obs_emb = None
         if obs_as_cond:
-            self.cond_obs_emb = nn.Linear(cond_dim, n_emb)
+            self.cond_obs_emb = nn.Linear(cond_dim, n_emb)  # project obs to embedding dim
 
         self.cond_pos_emb = None
         self.encoder = None
         self.decoder = None
         encoder_only = False
         if T_cond > 0:
-            self.cond_pos_emb = nn.Parameter(torch.zeros(1, T_cond, n_emb))
+            self.cond_pos_emb = nn.Parameter(torch.zeros(1, T_cond, n_emb))  # learned conditioning pos embed
             # use Transformer encoder as condition encoder
-            if n_cond_layers > 0:
+            if n_cond_layers > 0:  # n_cond_layers: default is 0 (use mlp only)
                 encoder_layer = nn.TransformerEncoderLayer(
                     d_model=n_emb,
                     nhead=n_head,
@@ -74,7 +74,7 @@ class TransformerForDiffusion(ModuleAttrMixin):
                     num_layers=n_cond_layers
                 )
             # use MLP as condition encoder
-            else:
+            else:  # conditioning embedding
                 self.encoder = nn.Sequential(
                     nn.Linear(n_emb, 4 * n_emb),
                     nn.Mish(),
@@ -121,7 +121,9 @@ class TransformerForDiffusion(ModuleAttrMixin):
             mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
             mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
             self.register_buffer("mask", mask)
-            
+
+            #====================================TODO=====================================#
+            # Figure out its functionalities
             if time_as_cond and obs_as_cond:
                 S = T_cond
                 t, s = torch.meshgrid(
@@ -132,6 +134,7 @@ class TransformerForDiffusion(ModuleAttrMixin):
                 mask = t >= (s-1) # add one dimension since time is the first token in cond
                 mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
                 self.register_buffer('memory_mask', mask)
+            #====================================TODO=====================================#
             else:
                 self.memory_mask = None
         else:
