@@ -10,7 +10,7 @@ setup(
     setup_requires=["setuptools>=62.3.0"],
     include_package_data=True,
     install_requires=[
-        "diffusers==0.27.2",
+        "diffusers==0.35.1",
         "einops==0.8.0",
         "torch==2.2.0",
         "torchvision==0.17.0",
