@@ -11,6 +11,7 @@ setup(
     include_package_data=True,
     install_requires=[
         "diffusers==0.35.1",
+        "dill==0.4.0",
         "einops==0.8.0",
         "torch==2.2.0",
         "torchvision==0.17.0",
