@@ -9,11 +9,11 @@ setup(
     python_requires=">=3.10",
     setup_requires=["setuptools>=62.3.0"],
     include_package_data=True,
-    install_requires=[
-        "diffusers==0.35.1",
-        "dill==0.4.0",
-        "einops==0.8.0",
-        "torch==2.2.0",
-        "torchvision==0.17.0",
-    ]
+    # install_requires=[
+    #     "diffusers==0.35.2",
+    #     "dill==0.4.0",
+    #     "einops==0.8.0",
+    #     "torch==2.2.0",
+    #     "torchvision==0.17.0",
+    # ]
 )
