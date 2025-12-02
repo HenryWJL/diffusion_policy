@@ -292,7 +292,7 @@ class DiffusionUnetHybridImagePolicy(BaseImagePolicy):
         # handle different ways of passing observation
         local_cond = None
         global_cond = None
-        trajectory = nactions
+        trajectory = nactions.float()
         cond_data = trajectory
         if self.obs_as_global_cond:
             # reshape B, T, ... to B*T
