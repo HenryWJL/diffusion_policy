@@ -25,28 +25,7 @@ dataset_path: &dataset_path data/open_door/train_data.zarr
 abs_action: &abs_action False
 
 env_runner:
-  _target_: diffusion_policy.env_runner.robomimic_image_runner.RobomimicImageRunner
-  dataset_path: *dataset_path
-  shape_meta: *shape_meta
-  # costs 1GB per env
-  n_train: 6
-  n_train_vis: 1
-  train_start_idx: 0
-  n_test: 50
-  n_test_vis: 3
-  test_start_seed: 100000
-  # use python's eval function as resolver, single-quoted string as argument
-  max_steps: ${eval:'500 if "${task.dataset_type}" == "mh" else 400'}
-  n_obs_steps: ${n_obs_steps}
-  n_action_steps: ${n_action_steps}
-  render_obs_key: 'agentview_image'
-  fps: 10
-  crf: 22
-  past_action: ${past_action_visible}
-  abs_action: *abs_action
-  tqdm_interval_sec: 1.0
-  n_envs: 28
-# evaluation at this config requires a 16 core 64GB instance.
+  _target_: diffusion_policy.env_runner.robosuite_image_runner.RobosuiteImageRunner
 
 dataset:
   _target_: diffusion_policy.dataset.robosuite_image_dataset.RobosuiteImageDataset
