@@ -285,11 +285,12 @@ class DiffusionUnetHybridImagePolicy(BaseImagePolicy):
         # normalize input
         assert 'valid_mask' not in batch
         nobs = self.normalizer.normalize(batch['obs'])
+        for key, val in nobs.items():
+            nobs[key] = val.float()
         nactions = self.normalizer['action'].normalize(batch['action'])
+        nactions = nactions.float()
         batch_size = nactions.shape[0]
         horizon = nactions.shape[1]
-
-        nactions = nactions.float()
 
         # handle different ways of passing observation
         local_cond = None
