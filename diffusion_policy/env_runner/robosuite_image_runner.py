@@ -4,3 +4,6 @@ class RobosuiteImageRunner(BaseImageRunner):
 
   def __init__(self, *args, **kwargs):
     super().__init__(output_dir=None)
+
+  def run(self):
+    return dict()
