@@ -289,8 +289,8 @@ class TrainDiffusionUnetHybridWorkspace(BaseWorkspace):
                     # )
 
                     # Download checkpoints
-                    from google.colab import files
-                    files.download(self.get_checkpoint_path())
+                    import shutil
+                    shutil.copy(self.get_checkpoint_path(), f"/content/drive/MyDrive/checkpoints/{self.epoch}.pth")
                 # ========= eval end for this epoch ==========
                 policy.train()
 
