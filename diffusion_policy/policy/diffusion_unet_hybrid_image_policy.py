@@ -289,10 +289,12 @@ class DiffusionUnetHybridImagePolicy(BaseImagePolicy):
         batch_size = nactions.shape[0]
         horizon = nactions.shape[1]
 
+        nactions = nactions.float()
+
         # handle different ways of passing observation
         local_cond = None
         global_cond = None
-        trajectory = nactions.float()
+        trajectory = nactions
         cond_data = trajectory
         if self.obs_as_global_cond:
             # reshape B, T, ... to B*T
@@ -310,6 +312,8 @@ class DiffusionUnetHybridImagePolicy(BaseImagePolicy):
             cond_data = torch.cat([nactions, nobs_features], dim=-1)
             trajectory = cond_data.detach()
 
+        cond_data = cond_data.float()
+        trajectory = trajectory.float()
         # generate impainting mask
         condition_mask = self.mask_generator(trajectory.shape)
 
@@ -325,7 +329,7 @@ class DiffusionUnetHybridImagePolicy(BaseImagePolicy):
         # (this is the forward diffusion process)
         noisy_trajectory = self.noise_scheduler.add_noise(
             trajectory, noise, timesteps)
-        
+        noisy_trajectory = noisy_trajectory.float()
         # compute loss mask
         loss_mask = ~condition_mask
 
