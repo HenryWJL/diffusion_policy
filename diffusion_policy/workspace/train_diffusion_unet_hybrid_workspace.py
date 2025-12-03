@@ -56,7 +56,7 @@ class TrainDiffusionUnetHybridWorkspace(BaseWorkspace):
 
         # configure training state
         self.global_step = 0
-        self.epoch = 0
+        self.epoch = 1
 
     def run(self):
         cfg = copy.deepcopy(self.cfg)
@@ -282,7 +282,7 @@ class TrainDiffusionUnetHybridWorkspace(BaseWorkspace):
                     ckpt_path = self.get_checkpoint_path()
                     api.upload_file(
                         path_or_fileobj=ckpt_path,
-                        path_in_repo=f"{cfg.task_name}/epoch={self.epoch + 1}_seed={cfg.training.seed}.pth",
+                        path_in_repo=f"{cfg.task_name}/epoch={self.epoch}_seed={cfg.training.seed}.pth",
                         repo_id=repo_id,
                         repo_type="model",
                         commit_message="Add checkpoints"
