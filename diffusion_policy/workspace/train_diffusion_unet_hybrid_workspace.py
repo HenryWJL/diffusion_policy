@@ -290,7 +290,7 @@ class TrainDiffusionUnetHybridWorkspace(BaseWorkspace):
 
                     # Download checkpoints
                     import shutil
-                    shutil.copy(self.get_checkpoint_path(), f"/content/drive/MyDrive/checkpoints/{self.epoch}.pth")
+                    shutil.copy(self.get_checkpoint_path(), f"/content/drive/MyDrive/checkpoints/{self.epoch}.ckpt")
                 # ========= eval end for this epoch ==========
                 policy.train()
 
