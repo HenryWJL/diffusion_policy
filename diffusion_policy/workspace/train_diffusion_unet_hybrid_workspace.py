@@ -288,9 +288,9 @@ class TrainDiffusionUnetHybridWorkspace(BaseWorkspace):
                     #     commit_message="Add checkpoints"
                     # )
 
-                    # Download checkpoints
-                    import shutil
-                    shutil.copy(self.get_checkpoint_path(), f"/content/drive/MyDrive/checkpoints/{self.epoch}.ckpt")
+                    # # Download checkpoints
+                    # import shutil
+                    # shutil.copy(self.get_checkpoint_path(), f"/content/drive/MyDrive/checkpoints/{self.epoch}.ckpt")
                 # ========= eval end for this epoch ==========
                 policy.train()
 
